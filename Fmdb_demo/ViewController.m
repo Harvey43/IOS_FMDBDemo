@@ -13,7 +13,7 @@
 @interface ViewController ()<UITextFieldDelegate,UITableViewDelegate,UITableViewDataSource>{
     NSString *insertName;
     NSString *insertAge;
- 
+    
     int updateId;
     NSString *updateName;
     NSString *updateAge;
@@ -120,23 +120,26 @@
 #pragma mark- Action
 - (IBAction)insertAction:(id)sender {
     [self insert];
-    [self query];
 }
 - (IBAction)updateAction:(id)sender {
     [self update];
-
+    
 }
 
 #pragma mark- FMDB
-- (void)testCreatSqlite{
+
+- (NSString *)getFileName{
     //1.获得数据库文件的路径
-    NSString *doc=[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) lastObject];
-    NSString *fileName=[doc stringByAppendingPathComponent:@"student.sqlite"];
-    
+    NSString *doc = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) lastObject];
+    NSString *fileName = [doc stringByAppendingPathComponent:@"student.sqlite"];
+    return fileName;
+}
+
+- (void)testCreatSqlite{
     //2.获得数据库
-    FMDatabase *db=[FMDatabase databaseWithPath:fileName];
+    FMDatabase *db=[FMDatabase databaseWithPath:[self getFileName]];
     
-    //3.打开数据库
+    //打开数据库
     if ([db open]) {
         //4.创表
         BOOL result = [db executeUpdate:@"CREATE TABLE IF NOT EXISTS t_student (id integer PRIMARY KEY AUTOINCREMENT, name text NOT NULL, age text NOT NULL);"];
@@ -146,51 +149,83 @@
         {
             NSLog(@"创表失败");
         }
+        [db close];
     }
     self.db = db;
 }
 //插入数据
 -(void)insert{
-    [self.db executeUpdate:@"INSERT INTO t_student (name, age) VALUES (?, ?);", insertName, insertAge];
+    //打开数据库
+    if ([self.db open]) {
+        BOOL res = [self.db executeUpdate:@"INSERT INTO t_student (name, age) VALUES (?, ?);", insertName, insertAge];
+        if (!res) {
+            NSLog(@"数据插入失败");
+        } else {
+            NSLog(@"数据插入成功");
+            [self query];
+        }
+        [self.db close];
+    }
+    
 }
 
 //更新数据
 - (void)update{
-    BOOL res = [self.db executeUpdate:@"update t_student set name = ? , age = ? where id = ? " , updateName,updateAge,@(updateId)];
-    if (!res) {
-        NSLog(@"数据修改失败");
-    } else {
-        NSLog(@"数据修改成功");
+    //打开数据库
+    if ([self.db open]) {
+        BOOL res = [self.db executeUpdate:@"update t_student set name = ? , age = ? where id = ? " , updateName,updateAge,@(updateId)];
+        if (!res) {
+            NSLog(@"数据修改失败");
+        } else {
+            NSLog(@"数据修改成功");
             [self query];
+        }
+        [self.db close];
     }
 }
 
 //删除数据
 -(void)delete
 {
-    [self.db executeUpdate:@"DELETE FROM t_student where id = ?",@(updateId)];
-    [self query];
-//    [self.db executeUpdate:@"DROP TABLE IF EXISTS t_student;"];
-//    [self.db executeUpdate:@"CREATE TABLE IF NOT EXISTS t_student (id integer PRIMARY KEY AUTOINCREMENT, name text NOT NULL, age integer NOT NULL);"];
+    //打开数据库
+    if ([self.db open]) {
+        BOOL res = [self.db executeUpdate:@"DELETE FROM t_student where id = ?",@(updateId)];;
+        if (!res) {
+            NSLog(@"数据删除失败");
+        } else {
+            NSLog(@"数据删除成功");
+            [self query];
+        }
+        [self.db close];
+    }
+    //    [self.db executeUpdate:@"DROP TABLE IF EXISTS t_student;"];
+    //    [self.db executeUpdate:@"CREATE TABLE IF NOT EXISTS t_student (id integer PRIMARY KEY AUTOINCREMENT, name text NOT NULL, age integer NOT NULL);"];
 }
 
 //查询
 - (void)query
 {
     [dataAry removeAllObjects];
-    // 1.执行查询语句
-    FMResultSet *resultSet = [self.db executeQuery:@"SELECT * FROM t_student"];
     
-    // 2.遍历结果
-    while ([resultSet next]) {
-        int ID = [resultSet intForColumn:@"id"];
-        NSString *name = [resultSet stringForColumn:@"name"];
-        NSString *age = [resultSet stringForColumn:@"age"];
+    //打开数据库
+    if ([self.db open]) {
+        // 1.执行查询语句
+        FMResultSet *resultSet = [self.db executeQuery:@"SELECT * FROM t_student"];
         
-        NSDictionary *dic = [[NSDictionary alloc] initWithObjectsAndKeys:@(ID),@"ID",name,@"name",age,@"age", nil];
-        [dataAry addObject:dic];
+        // 2.遍历结果
+        while ([resultSet next]) {
+            int ID = [resultSet intForColumn:@"id"];
+            NSString *name = [resultSet stringForColumn:@"name"];
+            NSString *age = [resultSet stringForColumn:@"age"];
+            
+            NSDictionary *dic = [[NSDictionary alloc] initWithObjectsAndKeys:@(ID),@"ID",name,@"name",age,@"age", nil];
+            [dataAry addObject:dic];
+        }
+        
+        [self.db close];
     }
     [tbView reloadData];
 }
 
 @end
+
